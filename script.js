@@ -1,72 +1,48 @@
-// Přepínač: zatím bez backendu
-const USE_BACKEND = true;
-
-// TADY si každý student nastaví svoje údaje (až bude backend):
-const BACKEND_URL = "https://vdf-games-kostak-2026.onrender.com/chat";
-const STUDENT_ID = "Kostak_Ladislav_4ITE";
-
 const form = document.getElementById("question-form");
 const textarea = document.getElementById("question");
 const emailInput = document.getElementById("email");
 const answerDiv = document.getElementById("answer");
+const submitButton = form.querySelector('button[type="submit"]');
 
-form.addEventListener("submit", async (e) => {
-  e.preventDefault();
+form.addEventListener("submit", async (event) => {
+  event.preventDefault();
 
-  const text = textarea.value.trim();
+  const message = textarea.value.trim();
   const email = emailInput.value.trim();
 
-  if (!text) {
+  if (!message) {
     answerDiv.textContent = "Nejdřív napiš dotaz.";
     return;
   }
 
-  // vždy ukážeme "loading"
-  answerDiv.textContent = "Zpracovávám dotaz…";
-  form.querySelector("button").disabled = true;
+  answerDiv.textContent = "AI přemýšlí…";
+  submitButton.disabled = true;
 
   try {
-    const payload = {
-      message: text,
-      student: STUDENT_ID,
-      email: email || null
-    };
-
-    // --- FAKE MODE (bez backendu) ---
-    if (!USE_BACKEND) {
-      answerDiv.textContent =
-        `Demo odpověď (bez serveru)\n\n` +
-        `Student: ${payload.student}\n` +
-        `Dotaz: ${payload.message}`;
-      return;
-    }
-
-    // --- REAL MODE (s backendem) ---
-    const res = await fetch(BACKEND_URL, {
+    const response = await fetch("/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
+      body: JSON.stringify({
+        message,
+        email: email || null,
+        student: "Rohlena_Patrik_4ITE"
+      })
     });
 
-    if (!res.ok) {
-      answerDiv.textContent = "Server vrátil chybu: " + res.status;
-      return;
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error || `Chyba serveru (${response.status})`);
     }
 
-    const data = await res.json();
-
-    if (data.reply) {
-      answerDiv.textContent = data.reply;
-    } else if (data.error) {
-      answerDiv.textContent = "Chyba serveru: " + data.error;
-    } else {
-      answerDiv.textContent = "Server nevrátil žádnou odpověď.";
-    }
-  } catch (err) {
-    console.error(err);
-    answerDiv.textContent = "Nepodařilo se spojit se serverem.";
-  } finally {
-    form.querySelector("button").disabled = false;
+    answerDiv.textContent = data.reply || "AI nevrátila žádnou odpověď.";
     textarea.value = "";
+  } catch (error) {
+    console.error(error);
+    answerDiv.textContent =
+      `Nepodařilo se získat odpověď: ${error.message}\n\n` +
+      "Zkontroluj, že běží Node.js server i Ollama a že máš stažený model.";
+  } finally {
+    submitButton.disabled = false;
   }
 });
